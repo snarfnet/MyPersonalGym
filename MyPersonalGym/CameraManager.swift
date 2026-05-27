@@ -13,7 +13,7 @@ final class CameraManager: NSObject {
 
     private let videoOutput = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "camera.pose.queue")
-    private let confidenceThreshold: Float = 0.3
+    private let confidenceThreshold: Float = 0.1
     private let ciContext = CIContext()
     private var lastFrameForward: CFTimeInterval = 0
     private let frameInterval: CFTimeInterval = 1.0 / 10.0 // 10fps for recording

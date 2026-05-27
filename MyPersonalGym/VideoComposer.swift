@@ -200,12 +200,24 @@ final class VideoComposer {
         y += 58
 
         // Debug: show detail count, pose info, exercise
-        let debugFont = UIFont.monospacedSystemFont(ofSize: 16, weight: .medium)
-        let poseInfo = pose != nil ? "joints:\(pose!.joints.count)" : "pose:nil"
+        let debugFont = UIFont.monospacedSystemFont(ofSize: 14, weight: .medium)
+        let poseInfo = pose != nil ? "j:\(pose!.joints.count)" : "pose:nil"
         draw("d:\(score.details.count) \(poseInfo) ex:\(exercise.rawValue)", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
-        y += 20
-        draw("reps:\(score.repCount) hold:\(String(format: "%.0f", score.holdTime)) o:\(String(format: "%.0f", score.overall))", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
-        y += 24
+        y += 18
+        if let p = pose {
+            let bodyJoints = [
+                ("S", p.point(.leftShoulder) != nil || p.point(.rightShoulder) != nil),
+                ("E", p.point(.leftElbow) != nil || p.point(.rightElbow) != nil),
+                ("W", p.point(.leftWrist) != nil || p.point(.rightWrist) != nil),
+                ("H", p.point(.leftHip) != nil || p.point(.rightHip) != nil),
+                ("K", p.point(.leftKnee) != nil || p.point(.rightKnee) != nil),
+                ("A", p.point(.leftAnkle) != nil || p.point(.rightAnkle) != nil),
+            ]
+            let jointStr = bodyJoints.map { $0.1 ? $0.0 : "-" }.joined()
+            draw("body: \(jointStr) (S=shldr E=elbow W=wrist H=hip K=knee A=ankle)", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
+            y += 18
+        }
+        y += 6
 
         // Rep count or hold time
         let repFont = UIFont.monospacedSystemFont(ofSize: 60, weight: .black)

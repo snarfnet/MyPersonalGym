@@ -140,7 +140,7 @@ final class VideoComposer {
             gc.setFillColor(UIColor(red: 0.04, green: 0.04, blue: 0.08, alpha: 1).cgColor)
             gc.fill(CGRect(x: 0, y: 0, width: reportW, height: h))
 
-            drawReport(gc: gc, exercise: exercise, score: score, width: reportW, height: h)
+            drawReport(gc: gc, pose: pose, exercise: exercise, score: score, width: reportW, height: h)
 
             // --- Right: Camera + skeleton ---
             let cameraRect = CGRect(x: reportW, y: 0, width: cameraW, height: h)
@@ -178,7 +178,7 @@ final class VideoComposer {
         }
     }
 
-    private func drawReport(gc: CGContext, exercise: Exercise, score: FormScore, width: CGFloat, height: CGFloat) {
+    private func drawReport(gc: CGContext, pose: BodyPose?, exercise: Exercise, score: FormScore, width: CGFloat, height: CGFloat) {
         let pad: CGFloat = 36
         var y: CGFloat = 36
 
@@ -199,9 +199,12 @@ final class VideoComposer {
         draw(exercise.name.uppercased(), at: CGPoint(x: pad, y: y), font: exFont, color: .white, gc: gc)
         y += 58
 
-        // Debug: show detail count
-        let debugFont = UIFont.monospacedSystemFont(ofSize: 18, weight: .medium)
-        draw("details: \(score.details.count) overall: \(String(format: "%.1f", score.overall))", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
+        // Debug: show detail count, pose info, exercise
+        let debugFont = UIFont.monospacedSystemFont(ofSize: 16, weight: .medium)
+        let poseInfo = pose != nil ? "joints:\(pose!.joints.count)" : "pose:nil"
+        draw("d:\(score.details.count) \(poseInfo) ex:\(exercise.rawValue)", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
+        y += 20
+        draw("reps:\(score.repCount) hold:\(String(format: "%.0f", score.holdTime)) o:\(String(format: "%.0f", score.overall))", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
         y += 24
 
         // Rep count or hold time

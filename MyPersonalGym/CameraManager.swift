@@ -14,6 +14,9 @@ final class CameraManager: NSObject {
     private let videoOutput = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "camera.pose.queue")
     private let confidenceThreshold: Float = 0.3
+    private let ciContext = CIContext()
+    private var lastFrameForward: CFTimeInterval = 0
+    private let frameInterval: CFTimeInterval = 1.0 / 10.0 // 10fps for recording
 
     func start() {
         guard !session.isRunning else { return }
@@ -104,16 +107,17 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([request])
 
-        // Forward frame for composed video recording
+        // Forward frame for composed video recording (throttled to ~10fps)
         if let onFrame = onFrame {
+            let now = CACurrentMediaTime()
+            guard now - lastFrameForward >= frameInterval else { return }
+            lastFrameForward = now
+
             let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-            let context = CIContext()
-            if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
+            if let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) {
                 let uiImage = UIImage(cgImage: cgImage)
                 let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                DispatchQueue.main.async {
-                    onFrame(uiImage, timestamp)
-                }
+                onFrame(uiImage, timestamp)
             }
         }
     }

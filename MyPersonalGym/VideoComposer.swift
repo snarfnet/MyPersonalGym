@@ -16,6 +16,7 @@ final class VideoComposer {
     private var frameCount: Int = 0
     private var timer: Timer?
     private var recordStart: Date?
+    private let composeQueue = DispatchQueue(label: "video.compose.queue")
 
     // Output size: landscape-ish, report left + camera right
     private let outputWidth = 1920
@@ -71,16 +72,38 @@ final class VideoComposer {
     }
 
     func appendFrame(cameraImage: UIImage, pose: BodyPose?, exercise: Exercise, score: FormScore, timestamp: CMTime) {
-        guard isRecording, let input = videoInput, let adapt = adaptor, input.isReadyForMoreMediaData else { return }
+        guard isRecording else { return }
 
-        if startTime == nil { startTime = timestamp }
-        let presentationTime = CMTimeSubtract(timestamp, startTime!)
+        // Capture current state for background composition
+        let currentPose = pose
+        let currentExercise = exercise
+        let currentScore = score
 
-        let composed = composeFrame(camera: cameraImage, pose: pose, exercise: exercise, score: score)
-        guard let pixelBuffer = pixelBufferFrom(image: composed) else { return }
+        composeQueue.async { [weak self] in
+            guard let self = self,
+                  self.isRecording,
+                  let input = self.videoInput,
+                  let adapt = self.adaptor,
+                  input.isReadyForMoreMediaData else { return }
 
-        adapt.append(pixelBuffer, withPresentationTime: presentationTime)
-        frameCount += 1
+            if self.startTime == nil { self.startTime = timestamp }
+            let presentationTime = CMTimeSubtract(timestamp, self.startTime!)
+            guard presentationTime.seconds >= 0 else { return }
+
+            let composed = self.composeFrame(camera: cameraImage, pose: currentPose, exercise: currentExercise, score: currentScore)
+
+            // Use pixel buffer pool if available, else create one
+            var pixelBuffer: CVPixelBuffer?
+            if let pool = adapt.pixelBufferPool {
+                CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pixelBuffer)
+            }
+
+            guard let pb = pixelBuffer ?? self.createPixelBuffer() else { return }
+            self.renderImage(composed, into: pb)
+
+            adapt.append(pb, withPresentationTime: presentationTime)
+            self.frameCount += 1
+        }
     }
 
     func stopRecording() {
@@ -90,6 +113,9 @@ final class VideoComposer {
         timer = nil
 
         guard let writer = assetWriter else { return }
+
+        // Wait for pending composition to finish before finalizing
+        composeQueue.sync {}
         videoInput?.markAsFinished()
 
         let url = writer.outputURL
@@ -292,19 +318,22 @@ final class VideoComposer {
 
     // MARK: - Pixel Buffer
 
-    private func pixelBufferFrom(image: UIImage) -> CVPixelBuffer? {
-        guard let cgImage = image.cgImage else { return nil }
-
+    private func createPixelBuffer() -> CVPixelBuffer? {
         var buffer: CVPixelBuffer?
         let attrs: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: outputWidth,
+            kCVPixelBufferHeightKey as String: outputHeight,
             kCVPixelBufferCGImageCompatibilityKey as String: true,
             kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
         ]
-
         let status = CVPixelBufferCreate(kCFAllocatorDefault, outputWidth, outputHeight,
                                           kCVPixelFormatType_32BGRA, attrs as CFDictionary, &buffer)
-        guard status == kCVReturnSuccess, let pb = buffer else { return nil }
+        return status == kCVReturnSuccess ? buffer : nil
+    }
 
+    private func renderImage(_ image: UIImage, into pb: CVPixelBuffer) {
+        guard let cgImage = image.cgImage else { return }
         CVPixelBufferLockBaseAddress(pb, [])
         let context = CGContext(
             data: CVPixelBufferGetBaseAddress(pb),
@@ -316,8 +345,6 @@ final class VideoComposer {
         )
         context?.draw(cgImage, in: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
         CVPixelBufferUnlockBaseAddress(pb, [])
-
-        return pb
     }
 
     // MARK: - Drawing Helpers

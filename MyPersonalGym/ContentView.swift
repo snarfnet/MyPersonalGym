@@ -48,11 +48,22 @@ struct ContentView: View {
             }
             camera.onFrame = { image, timestamp in
                 DispatchQueue.main.async {
+                    let pose = camera.currentPose
+                    let exercise = detector.selectedExercise
+                    var score = detector.formScore
+                    // Compute details directly to guarantee they're populated
+                    if let pose = pose {
+                        let isEn = Locale.preferredLanguages.first?.hasPrefix("en") == true
+                        score.details = PoseAnalyzer.analyze(exercise, pose: pose, isEnglish: isEn)
+                        if !score.details.isEmpty {
+                            score.overall = score.details.map(\.score).reduce(0, +) / Double(score.details.count)
+                        }
+                    }
                     composer.appendFrame(
                         cameraImage: image,
-                        pose: camera.currentPose,
-                        exercise: detector.selectedExercise,
-                        score: detector.formScore,
+                        pose: pose,
+                        exercise: exercise,
+                        score: score,
                         timestamp: timestamp
                     )
                 }

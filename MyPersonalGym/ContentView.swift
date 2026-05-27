@@ -4,7 +4,7 @@ import Vision
 struct ContentView: View {
     @State private var camera = CameraManager()
     @State private var detector = ExerciseDetector()
-    @State private var recorder = ScreenRecorder()
+    @State private var composer = VideoComposer()
     @State private var showExercisePicker = false
     @State private var showSaved = false
 
@@ -42,7 +42,18 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task { camera.start() }
+        .task {
+            camera.onFrame = { image, timestamp in
+                composer.appendFrame(
+                    cameraImage: image,
+                    pose: camera.currentPose,
+                    exercise: detector.selectedExercise,
+                    score: detector.formScore,
+                    timestamp: timestamp
+                )
+            }
+            camera.start()
+        }
         .onDisappear { camera.stop() }
         .onChange(of: camera.currentPose?.joints.count) {
             if let pose = camera.currentPose {
@@ -67,10 +78,10 @@ struct ContentView: View {
             Spacer()
 
             // Recording indicator
-            if recorder.isRecording {
+            if composer.isRecording {
                 HStack(spacing: 4) {
                     Circle().fill(.red).frame(width: 8, height: 8)
-                    Text("REC \(formatTime(recorder.recordingDuration))")
+                    Text("REC \(formatTime(composer.recordingDuration))")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
                         .foregroundStyle(.red)
                 }
@@ -210,9 +221,9 @@ struct ContentView: View {
             Button { toggleRecord() } label: {
                 ZStack {
                     Circle()
-                        .stroke(recorder.isRecording ? .red : .white, lineWidth: 3)
+                        .stroke(composer.isRecording ? .red : .white, lineWidth: 3)
                         .frame(width: 56, height: 56)
-                    if recorder.isRecording {
+                    if composer.isRecording {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(.red)
                             .frame(width: 22, height: 22)
@@ -333,12 +344,12 @@ struct ContentView: View {
     // MARK: - Recording
 
     private func toggleRecord() {
-        if recorder.isRecording {
-            recorder.stopAndSave()
+        if composer.isRecording {
+            composer.stopRecording()
             showSaved = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showSaved = false }
         } else {
-            recorder.startRecording()
+            composer.startRecording()
         }
     }
 

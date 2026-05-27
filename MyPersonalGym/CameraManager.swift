@@ -8,6 +8,9 @@ final class CameraManager: NSObject {
     var currentPose: BodyPose?
     var isBackCamera = true
 
+    /// Called on each video frame with (UIImage, CMTime) for composed video recording
+    var onFrame: ((UIImage, CMTime) -> Void)?
+
     private let videoOutput = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "camera.pose.queue")
     private let confidenceThreshold: Float = 0.3
@@ -100,5 +103,18 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([request])
+
+        // Forward frame for composed video recording
+        if let onFrame = onFrame {
+            let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+            let context = CIContext()
+            if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
+                let uiImage = UIImage(cgImage: cgImage)
+                let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                DispatchQueue.main.async {
+                    onFrame(uiImage, timestamp)
+                }
+            }
+        }
     }
 }

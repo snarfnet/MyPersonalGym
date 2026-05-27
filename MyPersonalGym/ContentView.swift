@@ -44,13 +44,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .task {
             camera.onFrame = { image, timestamp in
-                composer.appendFrame(
-                    cameraImage: image,
-                    pose: camera.currentPose,
-                    exercise: detector.selectedExercise,
-                    score: detector.formScore,
-                    timestamp: timestamp
-                )
+                composer.appendFrame(cameraImage: image, timestamp: timestamp)
             }
             camera.start()
         }
@@ -58,6 +52,10 @@ struct ContentView: View {
         .onChange(of: camera.currentPose?.joints.count) {
             if let pose = camera.currentPose {
                 detector.analyze(pose)
+                // Update composer with latest state for video recording
+                composer.latestPose = pose
+                composer.latestExercise = detector.selectedExercise
+                composer.latestScore = detector.formScore
             }
         }
     }

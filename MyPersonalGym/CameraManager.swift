@@ -11,6 +11,8 @@ final class CameraManager: NSObject {
 
     /// Called on each video frame with (UIImage, CMTime) for composed video recording
     var onFrame: ((UIImage, CMTime) -> Void)?
+    /// Called on main thread each time pose is updated
+    var onPoseUpdate: ((BodyPose) -> Void)?
 
     private let videoOutput = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "camera.pose.queue")
@@ -103,6 +105,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
             DispatchQueue.main.async {
                 self.currentPose = pose
                 self.poseUpdateCount += 1
+                self.onPoseUpdate?(pose)
             }
         }
 

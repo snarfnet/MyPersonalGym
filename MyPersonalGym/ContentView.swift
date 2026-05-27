@@ -43,6 +43,9 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .task {
+            camera.onPoseUpdate = { pose in
+                detector.analyze(pose)
+            }
             camera.onFrame = { image, timestamp in
                 DispatchQueue.main.async {
                     composer.latestPose = camera.currentPose
@@ -54,11 +57,6 @@ struct ContentView: View {
             camera.start()
         }
         .onDisappear { camera.stop() }
-        .onChange(of: camera.poseUpdateCount) {
-            if let pose = camera.currentPose {
-                detector.analyze(pose)
-            }
-        }
     }
 
     // MARK: - Top Bar

@@ -9,11 +9,6 @@ final class VideoComposer {
     var recordingDuration: TimeInterval = 0
     var savedMessage: String?
 
-    // Updated from main thread with latest state
-    var latestPose: BodyPose?
-    var latestExercise: Exercise = .squat
-    var latestScore = FormScore()
-
     private var assetWriter: AVAssetWriter?
     private var videoInput: AVAssetWriterInput?
     private var adaptor: AVAssetWriterInputPixelBufferAdaptor?
@@ -21,7 +16,6 @@ final class VideoComposer {
     private var frameCount: Int = 0
     private var timer: Timer?
     private var recordStart: Date?
-    private let composeQueue = DispatchQueue(label: "video.compose.queue")
 
     // Output size: landscape-ish, report left + camera right
     private let outputWidth = 1920
@@ -76,39 +70,27 @@ final class VideoComposer {
         }
     }
 
-    func appendFrame(cameraImage: UIImage, timestamp: CMTime) {
-        guard isRecording else { return }
+    func appendFrame(cameraImage: UIImage, pose: BodyPose?, exercise: Exercise, score: FormScore, timestamp: CMTime) {
+        guard isRecording,
+              let input = videoInput,
+              let adapt = adaptor,
+              input.isReadyForMoreMediaData else { return }
 
-        // Snapshot latest state from main thread
-        let currentPose = latestPose
-        let currentExercise = latestExercise
-        let currentScore = latestScore
+        if startTime == nil { startTime = timestamp }
+        let presentationTime = CMTimeSubtract(timestamp, startTime!)
+        guard presentationTime.seconds >= 0 else { return }
 
-        composeQueue.async { [weak self] in
-            guard let self = self,
-                  self.isRecording,
-                  let input = self.videoInput,
-                  let adapt = self.adaptor,
-                  input.isReadyForMoreMediaData else { return }
+        let composed = composeFrame(camera: cameraImage, pose: pose, exercise: exercise, score: score)
 
-            if self.startTime == nil { self.startTime = timestamp }
-            let presentationTime = CMTimeSubtract(timestamp, self.startTime!)
-            guard presentationTime.seconds >= 0 else { return }
-
-            let composed = self.composeFrame(camera: cameraImage, pose: currentPose, exercise: currentExercise, score: currentScore)
-
-            // Use pixel buffer pool if available, else create one
-            var pixelBuffer: CVPixelBuffer?
-            if let pool = adapt.pixelBufferPool {
-                CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pixelBuffer)
-            }
-
-            guard let pb = pixelBuffer ?? self.createPixelBuffer() else { return }
-            self.renderImage(composed, into: pb)
-
-            adapt.append(pb, withPresentationTime: presentationTime)
-            self.frameCount += 1
+        var pixelBuffer: CVPixelBuffer?
+        if let pool = adapt.pixelBufferPool {
+            CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pixelBuffer)
         }
+        guard let pb = pixelBuffer ?? createPixelBuffer() else { return }
+        renderImage(composed, into: pb)
+
+        adapt.append(pb, withPresentationTime: presentationTime)
+        frameCount += 1
     }
 
     func stopRecording() {
@@ -119,8 +101,6 @@ final class VideoComposer {
 
         guard let writer = assetWriter else { return }
 
-        // Wait for pending composition to finish before finalizing
-        composeQueue.sync {}
         videoInput?.markAsFinished()
 
         let url = writer.outputURL
@@ -218,6 +198,11 @@ final class VideoComposer {
         let exFont = UIFont.monospacedSystemFont(ofSize: 44, weight: .black)
         draw(exercise.name.uppercased(), at: CGPoint(x: pad, y: y), font: exFont, color: .white, gc: gc)
         y += 58
+
+        // Debug: show detail count
+        let debugFont = UIFont.monospacedSystemFont(ofSize: 18, weight: .medium)
+        draw("details: \(score.details.count) overall: \(String(format: "%.1f", score.overall))", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
+        y += 24
 
         // Rep count or hold time
         let repFont = UIFont.monospacedSystemFont(ofSize: 60, weight: .black)

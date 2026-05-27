@@ -48,10 +48,13 @@ struct ContentView: View {
             }
             camera.onFrame = { image, timestamp in
                 DispatchQueue.main.async {
-                    composer.latestPose = camera.currentPose
-                    composer.latestExercise = detector.selectedExercise
-                    composer.latestScore = detector.formScore
-                    composer.appendFrame(cameraImage: image, timestamp: timestamp)
+                    composer.appendFrame(
+                        cameraImage: image,
+                        pose: camera.currentPose,
+                        exercise: detector.selectedExercise,
+                        score: detector.formScore,
+                        timestamp: timestamp
+                    )
                 }
             }
             camera.start()

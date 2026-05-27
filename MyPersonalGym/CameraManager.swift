@@ -1,0 +1,104 @@
+import AVFoundation
+import Vision
+import UIKit
+
+@Observable
+final class CameraManager: NSObject {
+    let session = AVCaptureSession()
+    var currentPose: BodyPose?
+    var isBackCamera = true
+
+    private let videoOutput = AVCaptureVideoDataOutput()
+    private let queue = DispatchQueue(label: "camera.pose.queue")
+    private let confidenceThreshold: Float = 0.3
+
+    func start() {
+        guard !session.isRunning else { return }
+        queue.async { [weak self] in
+            self?.configureSession()
+            self?.session.startRunning()
+        }
+    }
+
+    func stop() {
+        queue.async { [weak self] in
+            self?.session.stopRunning()
+        }
+    }
+
+    func flipCamera() {
+        isBackCamera.toggle()
+        queue.async { [weak self] in
+            self?.configureSession()
+        }
+    }
+
+    private func configureSession() {
+        session.beginConfiguration()
+        session.inputs.forEach { session.removeInput($0) }
+        session.outputs.forEach { session.removeOutput($0) }
+
+        session.sessionPreset = .high
+
+        let position: AVCaptureDevice.Position = isBackCamera ? .back : .front
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
+              let input = try? AVCaptureDeviceInput(device: device) else {
+            session.commitConfiguration()
+            return
+        }
+
+        if session.canAddInput(input) { session.addInput(input) }
+
+        videoOutput.setSampleBufferDelegate(self, queue: queue)
+        videoOutput.alwaysDiscardsLateVideoFrames = true
+        if session.canAddOutput(videoOutput) { session.addOutput(videoOutput) }
+
+        if let connection = videoOutput.connection(with: .video) {
+            connection.videoRotationAngle = 90
+            if !isBackCamera { connection.isVideoMirrored = true }
+        }
+
+        session.commitConfiguration()
+    }
+}
+
+extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        let request = VNDetectHumanBodyPoseRequest { [weak self] request, error in
+            guard let self = self,
+                  let results = request.results as? [VNHumanBodyPoseObservation],
+                  let observation = results.first else {
+                DispatchQueue.main.async { self?.currentPose = nil }
+                return
+            }
+
+            var pose = BodyPose()
+            let jointNames: [VNHumanBodyPoseObservation.JointName] = [
+                .nose, .leftEye, .rightEye, .leftEar, .rightEar,
+                .leftShoulder, .rightShoulder,
+                .leftElbow, .rightElbow,
+                .leftWrist, .rightWrist,
+                .leftHip, .rightHip,
+                .leftKnee, .rightKnee,
+                .leftAnkle, .rightAnkle,
+                .neck, .root
+            ]
+
+            for name in jointNames {
+                guard let point = try? observation.recognizedPoint(name),
+                      point.confidence > self.confidenceThreshold else { continue }
+                // Vision coordinates: origin bottom-left, convert to screen (top-left origin)
+                pose.joints[name] = CGPoint(x: point.location.x, y: 1 - point.location.y)
+            }
+
+            DispatchQueue.main.async {
+                self.currentPose = pose
+            }
+        }
+
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+        try? handler.perform([request])
+    }
+}

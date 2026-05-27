@@ -1,0 +1,27 @@
+name: MyPersonalGym
+options:
+  bundleIdPrefix: com.tokyonasu
+  deploymentTarget:
+    iOS: "17.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: 1
+    DEVELOPMENT_TEAM: 83VGKGSQUH
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  MyPersonalGym:
+    type: application
+    platform: iOS
+    sources: [MyPersonalGym]
+    settings:
+      base:
+        PRODUCT_NAME: MyPersonalGym
+        PRODUCT_BUNDLE_IDENTIFIER: com.tokyonasu.mypersonalgym
+        INFOPLIST_FILE: MyPersonalGym/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme: {}

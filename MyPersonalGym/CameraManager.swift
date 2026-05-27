@@ -6,13 +6,10 @@ import UIKit
 final class CameraManager: NSObject {
     let session = AVCaptureSession()
     var currentPose: BodyPose?
-    var poseUpdateCount: Int = 0
     var isBackCamera = true
 
-    /// Called on each video frame with (UIImage, CMTime) for composed video recording
-    var onFrame: ((UIImage, CMTime) -> Void)?
-    /// Called on main thread each time pose is updated
-    var onPoseUpdate: ((BodyPose) -> Void)?
+    /// Called with (UIImage, CMTime, BodyPose?) - image, timestamp, and pose from same frame
+    var onFrame: ((UIImage, CMTime, BodyPose?) -> Void)?
 
     private let videoOutput = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "camera.pose.queue")
@@ -75,13 +72,13 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
+        // Detect pose synchronously on camera queue
+        var detectedPose: BodyPose?
+
         let request = VNDetectHumanBodyPoseRequest { [weak self] request, error in
             guard let self = self,
                   let results = request.results as? [VNHumanBodyPoseObservation],
-                  let observation = results.first else {
-                DispatchQueue.main.async { self?.currentPose = nil }
-                return
-            }
+                  let observation = results.first else { return }
 
             var pose = BodyPose()
             let jointNames: [VNHumanBodyPoseObservation.JointName] = [
@@ -98,21 +95,22 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
             for name in jointNames {
                 guard let point = try? observation.recognizedPoint(name),
                       point.confidence > self.confidenceThreshold else { continue }
-                // Vision coordinates: origin bottom-left, convert to screen (top-left origin)
                 pose.joints[name] = CGPoint(x: point.location.x, y: 1 - point.location.y)
             }
 
-            DispatchQueue.main.async {
-                self.currentPose = pose
-                self.poseUpdateCount += 1
-                self.onPoseUpdate?(pose)
-            }
+            detectedPose = pose
         }
 
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         try? handler.perform([request])
 
-        // Forward frame for composed video recording (throttled to ~10fps)
+        // Update UI on main thread
+        let poseForUI = detectedPose
+        DispatchQueue.main.async { [weak self] in
+            self?.currentPose = poseForUI
+        }
+
+        // Forward frame with pose for video recording (throttled to ~10fps)
         if let onFrame = onFrame {
             let now = CACurrentMediaTime()
             guard now - lastFrameForward >= frameInterval else { return }
@@ -122,7 +120,8 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
             if let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) {
                 let uiImage = UIImage(cgImage: cgImage)
                 let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                onFrame(uiImage, timestamp)
+                // Pass pose directly - no dispatch timing issues
+                onFrame(uiImage, timestamp, detectedPose)
             }
         }
     }

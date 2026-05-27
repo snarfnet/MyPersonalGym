@@ -43,22 +43,18 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .task {
-            camera.onPoseUpdate = { pose in
-                detector.analyze(pose)
-            }
-            camera.onFrame = { image, timestamp in
-                DispatchQueue.main.async {
-                    let pose = camera.currentPose
-                    let exercise = detector.selectedExercise
-                    var score = detector.formScore
-                    // Compute details directly to guarantee they're populated
-                    if let pose = pose {
-                        let isEn = Locale.preferredLanguages.first?.hasPrefix("en") == true
-                        score.details = PoseAnalyzer.analyze(exercise, pose: pose, isEnglish: isEn)
-                        if !score.details.isEmpty {
-                            score.overall = score.details.map(\.score).reduce(0, +) / Double(score.details.count)
-                        }
+            camera.onFrame = { image, timestamp, pose in
+                // Compute details on camera queue using pose from this frame
+                let exercise = detector.selectedExercise
+                let isEn = Locale.preferredLanguages.first?.hasPrefix("en") == true
+                var score = detector.formScore
+                if let pose = pose {
+                    score.details = PoseAnalyzer.analyze(exercise, pose: pose, isEnglish: isEn)
+                    if !score.details.isEmpty {
+                        score.overall = score.details.map(\.score).reduce(0, +) / Double(score.details.count)
                     }
+                }
+                DispatchQueue.main.async {
                     composer.appendFrame(
                         cameraImage: image,
                         pose: pose,
@@ -71,6 +67,11 @@ struct ContentView: View {
             camera.start()
         }
         .onDisappear { camera.stop() }
+        .onChange(of: camera.currentPose?.joints.count) {
+            if let pose = camera.currentPose {
+                detector.analyze(pose)
+            }
+        }
     }
 
     // MARK: - Top Bar

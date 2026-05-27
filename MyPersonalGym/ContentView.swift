@@ -202,6 +202,7 @@ struct ContentView: View {
     // MARK: - Bottom Bar
 
     private var bottomBar: some View {
+        VStack(spacing: 4) {
         HStack(spacing: 20) {
             // Flip camera
             Button { camera.flipCamera() } label: {
@@ -262,7 +263,8 @@ struct ContentView: View {
         Text(detector.selectedExercise.cameraTip)
             .font(.system(size: 10, weight: .medium, design: .monospaced))
             .foregroundStyle(.yellow.opacity(0.7))
-            .padding(.bottom, 4)
+        }
+        .padding(.bottom, 4)
     }
 
     // MARK: - Exercise Picker Overlay

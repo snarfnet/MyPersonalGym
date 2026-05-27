@@ -21,6 +21,12 @@ enum PoseAnalyzer {
         }
     }
 
+    // Use whichever side is available (or average if both)
+    private static func bestAngle(_ left: Double?, _ right: Double?) -> Double? {
+        if let l = left, let r = right { return (l + r) / 2 }
+        return left ?? right
+    }
+
     // MARK: - Squat
 
     static func analyzeSquat(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
@@ -28,8 +34,7 @@ enum PoseAnalyzer {
 
         let leftKnee = pose.angle(a: .leftHip, b: .leftKnee, c: .leftAnkle)
         let rightKnee = pose.angle(a: .rightHip, b: .rightKnee, c: .rightAnkle)
-        if let lk = leftKnee, let rk = rightKnee {
-            let avg = (lk + rk) / 2
+        if let avg = bestAngle(leftKnee, rightKnee) {
             let score = depthScore(avg)
             let fb = avg > 160 ? (isEnglish ? "Standing" : "立ち位置")
                 : avg > 120 ? (isEnglish ? "Go deeper!" : "もっと深く!")
@@ -37,19 +42,16 @@ enum PoseAnalyzer {
                 : (isEnglish ? "Good depth!" : "良い深さ!")
             details.append(FormDetail(label: isEnglish ? "Knee" : "膝角度", score: score, feedback: "\(Int(avg))° \(fb)"))
 
-            let diff = abs(lk - rk)
-            let bal = max(0, min(100, (1 - diff / 30) * 100))
-            details.append(FormDetail(label: isEnglish ? "Balance" : "左右", score: bal,
-                                      feedback: diff < 5 ? (isEnglish ? "Even!" : "均等!") : (isEnglish ? "Uneven" : "ずれ")))
+            if let lk = leftKnee, let rk = rightKnee {
+                let diff = abs(lk - rk)
+                let bal = max(0, min(100, (1 - diff / 30) * 100))
+                details.append(FormDetail(label: isEnglish ? "Balance" : "左右", score: bal,
+                                          feedback: diff < 5 ? (isEnglish ? "Even!" : "均等!") : (isEnglish ? "Uneven" : "ずれ")))
+            }
         }
 
-        if let back = backScore(pose, isEnglish: isEnglish) {
-            details.append(back)
-        }
-
-        if let stance = stanceScore(pose, isEnglish: isEnglish) {
-            details.append(stance)
-        }
+        if let back = backScore(pose, isEnglish: isEnglish) { details.append(back) }
+        if let stance = stanceScore(pose, isEnglish: isEnglish) { details.append(stance) }
 
         return details
     }
@@ -61,8 +63,7 @@ enum PoseAnalyzer {
 
         let le = pose.angle(a: .leftShoulder, b: .leftElbow, c: .leftWrist)
         let re = pose.angle(a: .rightShoulder, b: .rightElbow, c: .rightWrist)
-        if let le, let re {
-            let avg = (le + re) / 2
+        if let avg = bestAngle(le, re) {
             let score = depthScore(avg)
             let fb = avg > 160 ? (isEnglish ? "Arms extended" : "腕伸ばし")
                 : avg > 120 ? (isEnglish ? "Go lower!" : "もっと下げて!")
@@ -70,15 +71,15 @@ enum PoseAnalyzer {
                 : (isEnglish ? "Good depth!" : "良い深さ!")
             details.append(FormDetail(label: isEnglish ? "Elbow" : "肘角度", score: score, feedback: "\(Int(avg))° \(fb)"))
 
-            let diff = abs(le - re)
-            let bal = max(0, min(100, (1 - diff / 30) * 100))
-            details.append(FormDetail(label: isEnglish ? "Arm Bal." : "腕バランス", score: bal,
-                                      feedback: diff < 8 ? (isEnglish ? "Even!" : "均等!") : (isEnglish ? "Uneven" : "ずれ")))
+            if let le, let re {
+                let diff = abs(le - re)
+                let bal = max(0, min(100, (1 - diff / 30) * 100))
+                details.append(FormDetail(label: isEnglish ? "Arm Bal." : "腕バランス", score: bal,
+                                          feedback: diff < 8 ? (isEnglish ? "Even!" : "均等!") : (isEnglish ? "Uneven" : "ずれ")))
+            }
         }
 
-        if let body = bodyLineScore(pose, isEnglish: isEnglish) {
-            details.append(body)
-        }
+        if let body = bodyLineScore(pose, isEnglish: isEnglish) { details.append(body) }
 
         return details
     }
@@ -100,8 +101,8 @@ enum PoseAnalyzer {
 
         let lk = pose.angle(a: .leftHip, b: .leftKnee, c: .leftAnkle)
         let rk = pose.angle(a: .rightHip, b: .rightKnee, c: .rightAnkle)
-        if let lk, let rk {
-            let front = min(lk, rk)
+        if let avg = bestAngle(lk, rk) {
+            let front = avg
             let score = front >= 80 && front <= 100 ? 100.0 : max(0, 100 - abs(front - 90) * 2)
             let fb = front > 120 ? (isEnglish ? "Go lower" : "もっと下げて")
                 : front < 70 ? (isEnglish ? "Too deep" : "深すぎ")
@@ -119,11 +120,9 @@ enum PoseAnalyzer {
     static func analyzeDeadlift(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Hip hinge angle (shoulder-hip-knee)
         let lHinge = pose.angle(a: .leftShoulder, b: .leftHip, c: .leftKnee)
         let rHinge = pose.angle(a: .rightShoulder, b: .rightHip, c: .rightKnee)
-        if let lh = lHinge, let rh = rHinge {
-            let avg = (lh + rh) / 2
+        if let avg = bestAngle(lHinge, rHinge) {
             let score = avg >= 70 && avg <= 120 ? 100.0 : max(0, 100 - abs(avg - 95) * 1.5)
             let fb = avg > 150 ? (isEnglish ? "Standing" : "立ち位置")
                 : avg < 60 ? (isEnglish ? "Too low" : "低すぎ")
@@ -133,11 +132,9 @@ enum PoseAnalyzer {
 
         if let back = backScore(pose, isEnglish: isEnglish) { details.append(back) }
 
-        // Knee slight bend (not locked, not too bent)
         let lk = pose.angle(a: .leftHip, b: .leftKnee, c: .leftAnkle)
         let rk = pose.angle(a: .rightHip, b: .rightKnee, c: .rightAnkle)
-        if let lk, let rk {
-            let avg = (lk + rk) / 2
+        if let avg = bestAngle(lk, rk) {
             let score = avg >= 150 && avg <= 175 ? 100.0 : max(0, 100 - abs(avg - 165) * 2)
             let fb = avg < 140 ? (isEnglish ? "Knees too bent" : "膝曲がりすぎ")
                 : avg > 178 ? (isEnglish ? "Don't lock knees" : "膝ロック注意")
@@ -153,21 +150,21 @@ enum PoseAnalyzer {
     static func analyzeShoulderPress(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Arm extension (shoulder-elbow-wrist)
         let le = pose.angle(a: .leftShoulder, b: .leftElbow, c: .leftWrist)
         let re = pose.angle(a: .rightShoulder, b: .rightElbow, c: .rightWrist)
-        if let le, let re {
-            let avg = (le + re) / 2
+        if let avg = bestAngle(le, re) {
             let score = avg > 160 ? 100.0 : avg > 130 ? 70.0 : avg > 90 ? 50.0 : 40.0
             let fb = avg > 160 ? (isEnglish ? "Full extension!" : "完全伸展!")
                 : avg > 90 ? (isEnglish ? "Push up more" : "もっと上げて")
                 : (isEnglish ? "Start position" : "開始位置")
             details.append(FormDetail(label: isEnglish ? "Arms" : "腕伸展", score: score, feedback: "\(Int(avg))° \(fb)"))
 
-            let diff = abs(le - re)
-            let bal = max(0, min(100, (1 - diff / 30) * 100))
-            details.append(FormDetail(label: isEnglish ? "Balance" : "左右", score: bal,
-                                      feedback: diff < 8 ? (isEnglish ? "Even!" : "均等!") : (isEnglish ? "Uneven" : "ずれ")))
+            if let le, let re {
+                let diff = abs(le - re)
+                let bal = max(0, min(100, (1 - diff / 30) * 100))
+                details.append(FormDetail(label: isEnglish ? "Balance" : "左右", score: bal,
+                                          feedback: diff < 8 ? (isEnglish ? "Even!" : "均等!") : (isEnglish ? "Uneven" : "ずれ")))
+            }
         }
 
         if let back = backScore(pose, isEnglish: isEnglish) { details.append(back) }
@@ -180,9 +177,8 @@ enum PoseAnalyzer {
     static func analyzeBurpee(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Detect phase by hip height relative to ankles
-        if let hip = pose.midHip, let ankle = pose.midAnkle, let shoulder = pose.midShoulder {
-            let hipHeight = ankle.y - hip.y  // positive = hip above ankle in screen coords
+        if let hip = pose.midHip, let ankle = pose.midAnkle {
+            let hipHeight = ankle.y - hip.y
             let phase: String
             let score: Double
             if hipHeight > 0.3 {
@@ -208,10 +204,8 @@ enum PoseAnalyzer {
     static func analyzeSidePlank(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Body alignment (shoulder-hip-ankle)
         if let body = bodyLineScore(pose, isEnglish: isEnglish) { details.append(body) }
 
-        // Hip sag check
         if let shoulder = pose.midShoulder, let hip = pose.midHip, let ankle = pose.midAnkle {
             let midY = (shoulder.y + ankle.y) / 2
             let sag = abs(hip.y - midY) / (abs(ankle.y - shoulder.y) + 0.001)
@@ -230,11 +224,9 @@ enum PoseAnalyzer {
     static func analyzeCrunch(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Torso curl (shoulder-hip angle relative to horizontal)
         let lAngle = pose.angle(a: .leftShoulder, b: .leftHip, c: .leftKnee)
         let rAngle = pose.angle(a: .rightShoulder, b: .rightHip, c: .rightKnee)
-        if let la = lAngle, let ra = rAngle {
-            let avg = (la + ra) / 2
+        if let avg = bestAngle(lAngle, rAngle) {
             let score = avg < 120 ? 100.0 : avg < 140 ? 75.0 : 40.0
             let fb = avg > 150 ? (isEnglish ? "Curl up more" : "もっと起こして")
                 : avg < 90 ? (isEnglish ? "Good curl!" : "良いカール!")
@@ -250,11 +242,16 @@ enum PoseAnalyzer {
     static func analyzeJumpingJack(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Arm spread
-        if let ls = pose.point(.leftShoulder), let rs = pose.point(.rightShoulder),
-           let lw = pose.point(.leftWrist), let rw = pose.point(.rightWrist) {
+        // Arm spread - works with partial data too
+        let lw = pose.point(.leftWrist)
+        let rw = pose.point(.rightWrist)
+        let ls = pose.point(.leftShoulder)
+        let rs = pose.point(.rightShoulder)
+        if let lw, let rw, (ls != nil || rs != nil) {
             let armSpread = abs(lw.x - rw.x)
-            let shoulderW = abs(ls.x - rs.x)
+            let shoulderW: CGFloat
+            if let ls, let rs { shoulderW = abs(ls.x - rs.x) }
+            else { shoulderW = 0.15 } // approximate
             let ratio = shoulderW > 0.01 ? armSpread / shoulderW : 1
             let score = ratio > 2.5 ? 100.0 : ratio > 1.5 ? 70.0 : 40.0
             let fb = ratio > 2.5 ? (isEnglish ? "Arms wide!" : "腕開いてる!")
@@ -262,7 +259,6 @@ enum PoseAnalyzer {
             details.append(FormDetail(label: isEnglish ? "Arms" : "腕", score: score, feedback: fb))
         }
 
-        // Leg spread
         if let stance = stanceScore(pose, isEnglish: isEnglish) { details.append(stance) }
 
         return details
@@ -273,22 +269,18 @@ enum PoseAnalyzer {
     static func analyzeHipThrust(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Hip extension (shoulder-hip-knee angle)
         let lAngle = pose.angle(a: .leftShoulder, b: .leftHip, c: .leftKnee)
         let rAngle = pose.angle(a: .rightShoulder, b: .rightHip, c: .rightKnee)
-        if let la = lAngle, let ra = rAngle {
-            let avg = (la + ra) / 2
+        if let avg = bestAngle(lAngle, rAngle) {
             let score = avg >= 160 ? 100.0 : avg >= 140 ? 80.0 : avg >= 120 ? 60.0 : 40.0
             let fb = avg >= 160 ? (isEnglish ? "Full extension!" : "完全伸展!")
                 : (isEnglish ? "Push hips up" : "腰をもっと上げて")
             details.append(FormDetail(label: isEnglish ? "Hip Ext." : "腰伸展", score: score, feedback: "\(Int(avg))° \(fb)"))
         }
 
-        // Knee angle (should be ~90°)
         let lk = pose.angle(a: .leftHip, b: .leftKnee, c: .leftAnkle)
         let rk = pose.angle(a: .rightHip, b: .rightKnee, c: .rightAnkle)
-        if let lk, let rk {
-            let avg = (lk + rk) / 2
+        if let avg = bestAngle(lk, rk) {
             let score = avg >= 80 && avg <= 100 ? 100.0 : max(0, 100 - abs(avg - 90) * 2)
             details.append(FormDetail(label: isEnglish ? "Knee" : "膝", score: score, feedback: "\(Int(avg))°"))
         }
@@ -301,9 +293,8 @@ enum PoseAnalyzer {
     static func analyzeCalfRaise(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Ankle extension (knee-ankle vertical)
         if let ankle = pose.midAnkle, let knee = pose.midKnee {
-            let rise = knee.y - ankle.y // how much ankle is below knee
+            let rise = knee.y - ankle.y
             let score = rise > 0.15 ? 100.0 : rise > 0.1 ? 75.0 : 50.0
             let fb = score > 80 ? (isEnglish ? "Good height!" : "良い高さ!")
                 : (isEnglish ? "Rise higher" : "もっと上げて")
@@ -320,11 +311,9 @@ enum PoseAnalyzer {
     static func analyzeWallSit(_ pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
         var details: [FormDetail] = []
 
-        // Knee angle (should be ~90°)
         let lk = pose.angle(a: .leftHip, b: .leftKnee, c: .leftAnkle)
         let rk = pose.angle(a: .rightHip, b: .rightKnee, c: .rightAnkle)
-        if let lk, let rk {
-            let avg = (lk + rk) / 2
+        if let avg = bestAngle(lk, rk) {
             let score = avg >= 80 && avg <= 100 ? 100.0 : max(0, 100 - abs(avg - 90) * 2)
             let fb = avg > 120 ? (isEnglish ? "Go lower" : "もっと下げて")
                 : avg < 70 ? (isEnglish ? "Too low" : "低すぎ")
@@ -349,7 +338,15 @@ enum PoseAnalyzer {
     }
 
     static func backScore(_ pose: BodyPose, isEnglish: Bool) -> FormDetail? {
-        guard let shoulder = pose.midShoulder, let hip = pose.midHip else { return nil }
+        // Try midpoints first, fallback to single side
+        let shoulderPt: CGPoint?
+        let hipPt: CGPoint?
+        if let ms = pose.midShoulder { shoulderPt = ms }
+        else { shoulderPt = pose.point(.leftShoulder) ?? pose.point(.rightShoulder) }
+        if let mh = pose.midHip { hipPt = mh }
+        else { hipPt = pose.point(.leftHip) ?? pose.point(.rightHip) }
+
+        guard let shoulder = shoulderPt, let hip = hipPt else { return nil }
         let dx = abs(shoulder.x - hip.x)
         let dy = abs(shoulder.y - hip.y) + 0.001
         let lean = dx / dy
@@ -361,10 +358,15 @@ enum PoseAnalyzer {
     }
 
     static func stanceScore(_ pose: BodyPose, isEnglish: Bool) -> FormDetail? {
-        guard let la = pose.point(.leftAnkle), let ra = pose.point(.rightAnkle),
-              let ls = pose.point(.leftShoulder), let rs = pose.point(.rightShoulder) else { return nil }
+        let la = pose.point(.leftAnkle)
+        let ra = pose.point(.rightAnkle)
+        let ls = pose.point(.leftShoulder)
+        let rs = pose.point(.rightShoulder)
+        guard let la, let ra, (ls != nil || rs != nil) else { return nil }
         let feet = abs(la.x - ra.x)
-        let shoulders = abs(ls.x - rs.x)
+        let shoulders: CGFloat
+        if let ls, let rs { shoulders = abs(ls.x - rs.x) }
+        else { shoulders = 0.15 }
         let ratio = shoulders > 0.01 ? feet / shoulders : 1
         let score = max(0, min(100, (1 - abs(ratio - 1) * 2) * 100))
         let fb = ratio < 0.7 ? (isEnglish ? "Wider" : "もっと広く")
@@ -374,7 +376,10 @@ enum PoseAnalyzer {
     }
 
     static func bodyLineScore(_ pose: BodyPose, isEnglish: Bool) -> FormDetail? {
-        guard let shoulder = pose.midShoulder, let hip = pose.midHip, let ankle = pose.midAnkle else { return nil }
+        let shoulderPt = pose.midShoulder ?? pose.point(.leftShoulder) ?? pose.point(.rightShoulder)
+        let hipPt = pose.midHip ?? pose.point(.leftHip) ?? pose.point(.rightHip)
+        let anklePt = pose.midAnkle ?? pose.point(.leftAnkle) ?? pose.point(.rightAnkle)
+        guard let shoulder = shoulderPt, let hip = hipPt, let ankle = anklePt else { return nil }
         let midY = (shoulder.y + ankle.y) / 2
         let deviation = abs(hip.y - midY) / (abs(ankle.y - shoulder.y) + 0.001)
         let score = Double(max(0, min(100, (1 - deviation * 4) * 100)))
@@ -386,10 +391,16 @@ enum PoseAnalyzer {
     }
 
     static func shoulderOverWrists(_ pose: BodyPose, isEnglish: Bool) -> FormDetail? {
-        guard let ls = pose.point(.leftShoulder), let lw = pose.point(.leftWrist),
-              let rs = pose.point(.rightShoulder), let rw = pose.point(.rightWrist) else { return nil }
-        let sMidX = (ls.x + rs.x) / 2
-        let wMidX = (lw.x + rw.x) / 2
+        let ls = pose.point(.leftShoulder)
+        let lw = pose.point(.leftWrist)
+        let rs = pose.point(.rightShoulder)
+        let rw = pose.point(.rightWrist)
+        // Need at least one shoulder and one wrist
+        guard let sPt = ls ?? rs, let wPt = lw ?? rw else { return nil }
+        let sMidX: CGFloat
+        let wMidX: CGFloat
+        if let ls, let rs { sMidX = (ls.x + rs.x) / 2 } else { sMidX = sPt.x }
+        if let lw, let rw { wMidX = (lw.x + rw.x) / 2 } else { wMidX = wPt.x }
         let offset = abs(sMidX - wMidX)
         let score = max(0, min(100, (1 - offset * 5) * 100))
         let fb = offset < 0.05 ? (isEnglish ? "Aligned!" : "OK!")

@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"gh api repos/snarfnet/CuteSoroban/contents/CatSoroban/Info.plist -q '.content' | base64 -d 2>&1\",\"description\":\"Check CuteSoroban Info.plist for reference\"}",
-  "error": "Exit code 1\ngh: Not Found (HTTP 404)\nbase64: invalid input",
-  "timestamp": "2026-05-27T10:00:29.401Z",
-  "retry_count": 1
-}

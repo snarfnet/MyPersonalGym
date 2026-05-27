@@ -66,6 +66,6 @@ struct BodyPose {
         let mag2 = sqrt(v2.dx * v2.dx + v2.dy * v2.dy)
         guard mag1 > 0, mag2 > 0 else { return nil }
         let cosAngle = max(-1, min(1, dot / (mag1 * mag2)))
-        return acos(cosAngle) * 180 / .pi
+        return acos(cosAngle) * 180 / Double.pi
     }
 }

@@ -264,7 +264,7 @@ enum PoseAnalyzer {
         // Simpler: check if hip deviates from shoulder-ankle midline
         let midY = (shoulder.y + ankle.y) / 2
         let hipDeviation = abs(hip.y - midY) / abs(ankle.y - shoulder.y + 0.001)
-        let score = max(0, min(100, (1 - hipDeviation * 4) * 100))
+        let score = Double(max(0, min(100, (1 - hipDeviation * 4) * 100)))
         let hipHigh = hip.y < midY // In screen coords, lower y = higher position
 
         return (score, hipHigh)

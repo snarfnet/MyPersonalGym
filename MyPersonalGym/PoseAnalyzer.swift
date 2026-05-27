@@ -4,21 +4,31 @@ import Vision
 enum PoseAnalyzer {
 
     static func analyze(_ exercise: Exercise, pose: BodyPose, isEnglish: Bool) -> [FormDetail] {
+        let results: [FormDetail]
         switch exercise {
-        case .squat:         return analyzeSquat(pose, isEnglish: isEnglish)
-        case .pushup:        return analyzePushup(pose, isEnglish: isEnglish)
-        case .plank:         return analyzePlank(pose, isEnglish: isEnglish)
-        case .lunge:         return analyzeLunge(pose, isEnglish: isEnglish)
-        case .deadlift:      return analyzeDeadlift(pose, isEnglish: isEnglish)
-        case .shoulderPress: return analyzeShoulderPress(pose, isEnglish: isEnglish)
-        case .burpee:        return analyzeBurpee(pose, isEnglish: isEnglish)
-        case .sidePlank:     return analyzeSidePlank(pose, isEnglish: isEnglish)
-        case .crunch:        return analyzeCrunch(pose, isEnglish: isEnglish)
-        case .jumpingJack:   return analyzeJumpingJack(pose, isEnglish: isEnglish)
-        case .hipThrust:     return analyzeHipThrust(pose, isEnglish: isEnglish)
-        case .calfRaise:     return analyzeCalfRaise(pose, isEnglish: isEnglish)
-        case .wallSit:       return analyzeWallSit(pose, isEnglish: isEnglish)
+        case .squat:         results = analyzeSquat(pose, isEnglish: isEnglish)
+        case .pushup:        results = analyzePushup(pose, isEnglish: isEnglish)
+        case .plank:         results = analyzePlank(pose, isEnglish: isEnglish)
+        case .lunge:         results = analyzeLunge(pose, isEnglish: isEnglish)
+        case .deadlift:      results = analyzeDeadlift(pose, isEnglish: isEnglish)
+        case .shoulderPress: results = analyzeShoulderPress(pose, isEnglish: isEnglish)
+        case .burpee:        results = analyzeBurpee(pose, isEnglish: isEnglish)
+        case .sidePlank:     results = analyzeSidePlank(pose, isEnglish: isEnglish)
+        case .crunch:        results = analyzeCrunch(pose, isEnglish: isEnglish)
+        case .jumpingJack:   results = analyzeJumpingJack(pose, isEnglish: isEnglish)
+        case .hipThrust:     results = analyzeHipThrust(pose, isEnglish: isEnglish)
+        case .calfRaise:     results = analyzeCalfRaise(pose, isEnglish: isEnglish)
+        case .wallSit:       results = analyzeWallSit(pose, isEnglish: isEnglish)
         }
+
+        if results.isEmpty {
+            return [FormDetail(
+                label: isEnglish ? "Camera" : "カメラ",
+                score: 0,
+                feedback: isEnglish ? "Show your full body (head to feet)" : "全身を映してください（頭から足先まで）"
+            )]
+        }
+        return results
     }
 
     // Use whichever side is available (or average if both)

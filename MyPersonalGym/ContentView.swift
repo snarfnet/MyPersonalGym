@@ -44,18 +44,19 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .task {
             camera.onFrame = { image, timestamp in
-                composer.appendFrame(cameraImage: image, timestamp: timestamp)
+                DispatchQueue.main.async {
+                    composer.latestPose = camera.currentPose
+                    composer.latestExercise = detector.selectedExercise
+                    composer.latestScore = detector.formScore
+                    composer.appendFrame(cameraImage: image, timestamp: timestamp)
+                }
             }
             camera.start()
         }
         .onDisappear { camera.stop() }
-        .onChange(of: camera.currentPose?.joints.count) {
+        .onChange(of: camera.poseUpdateCount) {
             if let pose = camera.currentPose {
                 detector.analyze(pose)
-                // Update composer with latest state for video recording
-                composer.latestPose = pose
-                composer.latestExercise = detector.selectedExercise
-                composer.latestScore = detector.formScore
             }
         }
     }

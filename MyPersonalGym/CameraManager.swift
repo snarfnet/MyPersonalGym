@@ -6,6 +6,7 @@ import UIKit
 final class CameraManager: NSObject {
     let session = AVCaptureSession()
     var currentPose: BodyPose?
+    var poseUpdateCount: Int = 0
     var isBackCamera = true
 
     /// Called on each video frame with (UIImage, CMTime) for composed video recording
@@ -101,6 +102,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 
             DispatchQueue.main.async {
                 self.currentPose = pose
+                self.poseUpdateCount += 1
             }
         }
 

@@ -5,23 +5,60 @@ enum Exercise: String, CaseIterable, Identifiable {
     case squat = "squat"
     case pushup = "pushup"
     case plank = "plank"
+    case lunge = "lunge"
+    case deadlift = "deadlift"
+    case shoulderPress = "shoulderPress"
+    case burpee = "burpee"
+    case sidePlank = "sidePlank"
+    case crunch = "crunch"
+    case jumpingJack = "jumpingJack"
+    case hipThrust = "hipThrust"
+    case calfRaise = "calfRaise"
+    case wallSit = "wallSit"
 
     var id: String { rawValue }
 
     var name: String {
-        let isEnglish = Locale.preferredLanguages.first?.hasPrefix("en") == true
+        let en = Locale.preferredLanguages.first?.hasPrefix("en") == true
         switch self {
-        case .squat:  return isEnglish ? "Squat" : "スクワット"
-        case .pushup: return isEnglish ? "Push-Up" : "プッシュアップ"
-        case .plank:  return isEnglish ? "Plank" : "プランク"
+        case .squat:         return en ? "Squat" : "スクワット"
+        case .pushup:        return en ? "Push-Up" : "プッシュアップ"
+        case .plank:         return en ? "Plank" : "プランク"
+        case .lunge:         return en ? "Lunge" : "ランジ"
+        case .deadlift:      return en ? "Deadlift" : "デッドリフト"
+        case .shoulderPress: return en ? "Shoulder Press" : "ショルダープレス"
+        case .burpee:        return en ? "Burpee" : "バーピー"
+        case .sidePlank:     return en ? "Side Plank" : "サイドプランク"
+        case .crunch:        return en ? "Crunch" : "クランチ"
+        case .jumpingJack:   return en ? "Jumping Jack" : "ジャンピングジャック"
+        case .hipThrust:     return en ? "Hip Thrust" : "ヒップスラスト"
+        case .calfRaise:     return en ? "Calf Raise" : "カーフレイズ"
+        case .wallSit:       return en ? "Wall Sit" : "ウォールシット"
         }
     }
 
     var icon: String {
         switch self {
-        case .squat:  return "figure.strengthtraining.traditional"
-        case .pushup: return "figure.core.training"
-        case .plank:  return "figure.yoga"
+        case .squat:         return "figure.strengthtraining.traditional"
+        case .pushup:        return "figure.core.training"
+        case .plank:         return "figure.yoga"
+        case .lunge:         return "figure.walk"
+        case .deadlift:      return "figure.strengthtraining.functional"
+        case .shoulderPress: return "figure.arms.open"
+        case .burpee:        return "figure.jumprope"
+        case .sidePlank:     return "figure.pilates"
+        case .crunch:        return "figure.core.training"
+        case .jumpingJack:   return "figure.jumprope"
+        case .hipThrust:     return "figure.flexibility"
+        case .calfRaise:     return "figure.step.training"
+        case .wallSit:       return "figure.stand"
+        }
+    }
+
+    var isHold: Bool {
+        switch self {
+        case .plank, .sidePlank, .wallSit: return true
+        default: return false
         }
     }
 }
@@ -42,10 +79,10 @@ struct FormDetail {
 
 enum ExercisePhase {
     case idle
-    case down      // squat: going down, pushup: going down
-    case hold      // plank hold, bottom of squat/pushup
-    case up        // returning to start
-    case completed // rep completed
+    case down
+    case hold
+    case up
+    case completed
 }
 
 struct BodyPose {
@@ -67,5 +104,25 @@ struct BodyPose {
         guard mag1 > 0, mag2 > 0 else { return nil }
         let cosAngle = max(-1, min(1, dot / (mag1 * mag2)))
         return acos(cosAngle) * 180 / Double.pi
+    }
+
+    var midShoulder: CGPoint? {
+        guard let ls = point(.leftShoulder), let rs = point(.rightShoulder) else { return nil }
+        return CGPoint(x: (ls.x + rs.x) / 2, y: (ls.y + rs.y) / 2)
+    }
+
+    var midHip: CGPoint? {
+        guard let lh = point(.leftHip), let rh = point(.rightHip) else { return nil }
+        return CGPoint(x: (lh.x + rh.x) / 2, y: (lh.y + rh.y) / 2)
+    }
+
+    var midAnkle: CGPoint? {
+        guard let la = point(.leftAnkle), let ra = point(.rightAnkle) else { return nil }
+        return CGPoint(x: (la.x + ra.x) / 2, y: (la.y + ra.y) / 2)
+    }
+
+    var midKnee: CGPoint? {
+        guard let lk = point(.leftKnee), let rk = point(.rightKnee) else { return nil }
+        return CGPoint(x: (lk.x + rk.x) / 2, y: (lk.y + rk.y) / 2)
     }
 }

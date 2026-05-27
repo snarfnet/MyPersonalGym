@@ -6,10 +6,9 @@ final class ExerciseDetector {
     var selectedExercise: Exercise = .squat
     var formScore = FormScore()
 
-    // Rep counting state
     private var lastAngle: Double = 180
     private var repPhase: RepPhase = .up
-    private var plankStartTime: Date?
+    private var holdStartTime: Date?
 
     private enum RepPhase {
         case up, goingDown, down, goingUp
@@ -18,49 +17,78 @@ final class ExerciseDetector {
     private let isEnglish = Locale.preferredLanguages.first?.hasPrefix("en") == true
 
     func analyze(_ pose: BodyPose) {
-        let details: [FormDetail]
+        let details = PoseAnalyzer.analyze(selectedExercise, pose: pose, isEnglish: isEnglish)
 
-        switch selectedExercise {
-        case .squat:
-            details = PoseAnalyzer.analyzeSquat(pose, isEnglish: isEnglish)
-            countSquatReps(pose)
-        case .pushup:
-            details = PoseAnalyzer.analyzePushup(pose, isEnglish: isEnglish)
-            countPushupReps(pose)
-        case .plank:
-            details = PoseAnalyzer.analyzePlank(pose, isEnglish: isEnglish)
-            trackPlankHold(pose)
+        if selectedExercise.isHold {
+            trackHold(pose)
+        } else {
+            countReps(pose)
         }
 
-        let overall = details.isEmpty ? 0 : details.map(\.score).reduce(0, +) / Double(details.count)
-
         formScore.details = details
-        formScore.overall = overall
+        formScore.overall = details.isEmpty ? 0 : details.map(\.score).reduce(0, +) / Double(details.count)
     }
 
     func reset() {
         formScore = FormScore()
         lastAngle = 180
         repPhase = .up
-        plankStartTime = nil
+        holdStartTime = nil
     }
 
     // MARK: - Rep Counting
 
-    private func countSquatReps(_ pose: BodyPose) {
-        let leftKnee = pose.angle(a: .leftHip, b: .leftKnee, c: .leftAnkle)
-        let rightKnee = pose.angle(a: .rightHip, b: .rightKnee, c: .rightAnkle)
-        guard let lk = leftKnee, let rk = rightKnee else { return }
-        let kneeAngle = (lk + rk) / 2
-        updateRepCount(currentAngle: kneeAngle, downThreshold: 110, upThreshold: 150)
-    }
+    private func countReps(_ pose: BodyPose) {
+        let angle: Double?
 
-    private func countPushupReps(_ pose: BodyPose) {
-        let leftElbow = pose.angle(a: .leftShoulder, b: .leftElbow, c: .leftWrist)
-        let rightElbow = pose.angle(a: .rightShoulder, b: .rightElbow, c: .rightWrist)
-        guard let le = leftElbow, let re = rightElbow else { return }
-        let elbowAngle = (le + re) / 2
-        updateRepCount(currentAngle: elbowAngle, downThreshold: 110, upThreshold: 150)
+        switch selectedExercise {
+        case .squat, .lunge, .wallSit, .calfRaise:
+            let lk = pose.angle(a: .leftHip, b: .leftKnee, c: .leftAnkle)
+            let rk = pose.angle(a: .rightHip, b: .rightKnee, c: .rightAnkle)
+            if let lk, let rk { angle = (lk + rk) / 2 } else { angle = nil }
+
+        case .pushup:
+            let le = pose.angle(a: .leftShoulder, b: .leftElbow, c: .leftWrist)
+            let re = pose.angle(a: .rightShoulder, b: .rightElbow, c: .rightWrist)
+            if let le, let re { angle = (le + re) / 2 } else { angle = nil }
+
+        case .shoulderPress:
+            let le = pose.angle(a: .leftShoulder, b: .leftElbow, c: .leftWrist)
+            let re = pose.angle(a: .rightShoulder, b: .rightElbow, c: .rightWrist)
+            if let le, let re { angle = (le + re) / 2 } else { angle = nil }
+
+        case .deadlift:
+            let lh = pose.angle(a: .leftShoulder, b: .leftHip, c: .leftKnee)
+            let rh = pose.angle(a: .rightShoulder, b: .rightHip, c: .rightKnee)
+            if let lh, let rh { angle = (lh + rh) / 2 } else { angle = nil }
+
+        case .crunch:
+            let la = pose.angle(a: .leftShoulder, b: .leftHip, c: .leftKnee)
+            let ra = pose.angle(a: .rightShoulder, b: .rightHip, c: .rightKnee)
+            if let la, let ra { angle = (la + ra) / 2 } else { angle = nil }
+
+        case .hipThrust:
+            let la = pose.angle(a: .leftShoulder, b: .leftHip, c: .leftKnee)
+            let ra = pose.angle(a: .rightShoulder, b: .rightHip, c: .rightKnee)
+            if let la, let ra { angle = (la + ra) / 2 } else { angle = nil }
+
+        case .burpee:
+            // Use hip height as proxy
+            if let hip = pose.midHip, let ankle = pose.midAnkle {
+                angle = Double(ankle.y - hip.y) * 500 // scale to angle-like range
+            } else { angle = nil }
+
+        case .jumpingJack:
+            if let la = pose.point(.leftAnkle), let ra = pose.point(.rightAnkle) {
+                angle = Double(abs(la.x - ra.x)) * 500
+            } else { angle = nil }
+
+        default:
+            angle = nil
+        }
+
+        guard let currentAngle = angle else { return }
+        updateRepCount(currentAngle: currentAngle, downThreshold: 110, upThreshold: 150)
     }
 
     private func updateRepCount(currentAngle: Double, downThreshold: Double, upThreshold: Double) {
@@ -71,9 +99,7 @@ final class ExerciseDetector {
                 formScore.currentPhase = .down
             }
         case .goingDown:
-            if currentAngle < lastAngle {
-                // Still going down
-            } else {
+            if currentAngle >= lastAngle {
                 repPhase = .down
                 formScore.currentPhase = .hold
             }
@@ -92,16 +118,14 @@ final class ExerciseDetector {
         lastAngle = currentAngle
     }
 
-    private func trackPlankHold(_ pose: BodyPose) {
+    private func trackHold(_ pose: BodyPose) {
         let hasBody = pose.point(.leftShoulder) != nil && pose.point(.leftHip) != nil
         if hasBody {
-            if plankStartTime == nil {
-                plankStartTime = Date()
-            }
-            formScore.holdTime = Date().timeIntervalSince(plankStartTime!)
+            if holdStartTime == nil { holdStartTime = Date() }
+            formScore.holdTime = Date().timeIntervalSince(holdStartTime!)
             formScore.currentPhase = .hold
         } else {
-            plankStartTime = nil
+            holdStartTime = nil
             formScore.currentPhase = .idle
         }
     }

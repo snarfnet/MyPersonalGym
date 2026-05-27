@@ -21,6 +21,8 @@ settings:
     INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.healthcare-fitness"
     INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
     INFOPLIST_KEY_NSCameraUsageDescription: "Camera is used to analyze your exercise form in real-time"
+    INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "Save workout videos to your photo library"
+    INFOPLIST_KEY_NSMicrophoneUsageDescription: "Microphone is used for video recording"
 
 targets:
   MyPersonalGym:

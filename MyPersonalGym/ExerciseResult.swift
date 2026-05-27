@@ -61,6 +61,20 @@ enum Exercise: String, CaseIterable, Identifiable {
         default: return false
         }
     }
+
+    var cameraTip: String {
+        let en = Locale.preferredLanguages.first?.hasPrefix("en") == true
+        switch self {
+        case .squat, .deadlift, .lunge, .calfRaise, .wallSit:
+            return en ? "Side view recommended" : "横から撮影がおすすめ"
+        case .pushup, .plank, .sidePlank, .crunch, .hipThrust:
+            return en ? "Side view recommended" : "横から撮影がおすすめ"
+        case .shoulderPress, .jumpingJack:
+            return en ? "Front view recommended" : "正面から撮影がおすすめ"
+        case .burpee:
+            return en ? "Side view recommended" : "横から撮影がおすすめ"
+        }
+    }
 }
 
 struct FormScore {

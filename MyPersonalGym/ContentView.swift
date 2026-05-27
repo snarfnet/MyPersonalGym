@@ -258,7 +258,11 @@ struct ContentView: View {
                     .background(.white.opacity(0.15), in: Circle())
             }
         }
-        .padding(.bottom, 8)
+        // Camera angle tip
+        Text(detector.selectedExercise.cameraTip)
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .foregroundStyle(.yellow.opacity(0.7))
+            .padding(.bottom, 4)
     }
 
     // MARK: - Exercise Picker Overlay
@@ -286,6 +290,16 @@ struct ContentView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
+
+                    // Camera positioning tip
+                    HStack(spacing: 6) {
+                        Image(systemName: "camera.viewfinder")
+                            .font(.system(size: 12))
+                        Text(isEnglish ? "Show full body (head to feet)" : "全身を映してください（頭から足先まで）")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    }
+                    .foregroundStyle(.yellow.opacity(0.8))
+                    .padding(.horizontal, 16)
 
                     LazyVGrid(columns: [
                         GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())

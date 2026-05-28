@@ -17,6 +17,11 @@ final class VideoComposer {
     private var timer: Timer?
     private var recordStart: Date?
 
+    // Throttle score display updates (keep last stable score for smoother video)
+    private var lastScoreUpdate: CFTimeInterval = 0
+    private var stableScore = FormScore()
+    private let scoreUpdateInterval: CFTimeInterval = 1.0
+
     // Output size: landscape-ish, report left + camera right
     private let outputWidth = 1920
     private let outputHeight = 1080
@@ -80,7 +85,17 @@ final class VideoComposer {
         let presentationTime = CMTimeSubtract(timestamp, startTime!)
         guard presentationTime.seconds >= 0 else { return }
 
-        let composed = composeFrame(camera: cameraImage, pose: pose, exercise: exercise, score: score)
+        // Throttle score display updates for smoother video
+        let now = CACurrentMediaTime()
+        if now - lastScoreUpdate >= scoreUpdateInterval {
+            stableScore = score
+            lastScoreUpdate = now
+        }
+        // Always use latest rep count and hold time
+        stableScore.repCount = score.repCount
+        stableScore.holdTime = score.holdTime
+
+        let composed = composeFrame(camera: cameraImage, pose: pose, exercise: exercise, score: stableScore)
 
         var pixelBuffer: CVPixelBuffer?
         if let pool = adapt.pixelBufferPool {
@@ -183,76 +198,56 @@ final class VideoComposer {
         var y: CGFloat = 36
 
         // Title
-        let titleFont = UIFont.monospacedSystemFont(ofSize: 36, weight: .bold)
+        let titleFont = UIFont.monospacedSystemFont(ofSize: 42, weight: .bold)
         draw("MY PERSONAL GYM", at: CGPoint(x: pad, y: y), font: titleFont, color: .orange, gc: gc)
-        y += 50
+        y += 56
 
-        let subFont = UIFont.monospacedSystemFont(ofSize: 22, weight: .medium)
+        let subFont = UIFont.monospacedSystemFont(ofSize: 26, weight: .medium)
         draw(isEnglish ? "AI Form Checker" : "AIフォームチェッカー", at: CGPoint(x: pad, y: y), font: subFont, color: UIColor.orange.withAlphaComponent(0.5), gc: gc)
-        y += 36
+        y += 40
 
         drawDivider(gc: gc, y: y, x1: pad, x2: width - pad)
-        y += 20
+        y += 16
 
         // Exercise name
-        let exFont = UIFont.monospacedSystemFont(ofSize: 44, weight: .black)
+        let exFont = UIFont.monospacedSystemFont(ofSize: 52, weight: .black)
         draw(exercise.name.uppercased(), at: CGPoint(x: pad, y: y), font: exFont, color: .white, gc: gc)
-        y += 58
-
-        // Debug: show detail count, pose info, exercise
-        let debugFont = UIFont.monospacedSystemFont(ofSize: 14, weight: .medium)
-        let poseInfo = pose != nil ? "j:\(pose!.joints.count)" : "pose:nil"
-        draw("d:\(score.details.count) \(poseInfo) ex:\(exercise.rawValue)", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
-        y += 18
-        if let p = pose {
-            let bodyJoints = [
-                ("S", p.point(.leftShoulder) != nil || p.point(.rightShoulder) != nil),
-                ("E", p.point(.leftElbow) != nil || p.point(.rightElbow) != nil),
-                ("W", p.point(.leftWrist) != nil || p.point(.rightWrist) != nil),
-                ("H", p.point(.leftHip) != nil || p.point(.rightHip) != nil),
-                ("K", p.point(.leftKnee) != nil || p.point(.rightKnee) != nil),
-                ("A", p.point(.leftAnkle) != nil || p.point(.rightAnkle) != nil),
-            ]
-            let jointStr = bodyJoints.map { $0.1 ? $0.0 : "-" }.joined()
-            draw("body: \(jointStr) (S=shldr E=elbow W=wrist H=hip K=knee A=ankle)", at: CGPoint(x: pad, y: y), font: debugFont, color: .yellow, gc: gc)
-            y += 18
-        }
-        y += 6
+        y += 66
 
         // Rep count or hold time
-        let repFont = UIFont.monospacedSystemFont(ofSize: 60, weight: .black)
+        let repFont = UIFont.monospacedSystemFont(ofSize: 72, weight: .black)
         if exercise.isHold {
             let mins = Int(score.holdTime) / 60
             let secs = Int(score.holdTime) % 60
             draw(String(format: "%d:%02d", mins, secs), at: CGPoint(x: pad, y: y), font: repFont, color: .orange, gc: gc)
-            let holdLabel = UIFont.monospacedSystemFont(ofSize: 26, weight: .medium)
-            draw(isEnglish ? "HOLD TIME" : "ホールド時間", at: CGPoint(x: pad + 200, y: y + 24), font: holdLabel, color: UIColor.orange.withAlphaComponent(0.6), gc: gc)
+            let holdLabel = UIFont.monospacedSystemFont(ofSize: 30, weight: .medium)
+            draw(isEnglish ? "HOLD TIME" : "ホールド時間", at: CGPoint(x: pad + 240, y: y + 28), font: holdLabel, color: UIColor.orange.withAlphaComponent(0.6), gc: gc)
         } else {
             draw("\(score.repCount)", at: CGPoint(x: pad, y: y), font: repFont, color: .orange, gc: gc)
-            let repLabel = UIFont.monospacedSystemFont(ofSize: 26, weight: .medium)
-            draw("REPS", at: CGPoint(x: pad + 100, y: y + 24), font: repLabel, color: UIColor.orange.withAlphaComponent(0.6), gc: gc)
+            let repLabel = UIFont.monospacedSystemFont(ofSize: 30, weight: .medium)
+            draw("REPS", at: CGPoint(x: pad + 120, y: y + 28), font: repLabel, color: UIColor.orange.withAlphaComponent(0.6), gc: gc)
         }
-        y += 80
+        y += 92
 
         // Overall score
-        let gradeFont = UIFont.monospacedSystemFont(ofSize: 88, weight: .black)
+        let gradeFont = UIFont.monospacedSystemFont(ofSize: 100, weight: .black)
         let grade = gradeFor(score.overall)
         let gradeColor = colorForScore(score.overall)
         draw(grade, at: CGPoint(x: pad, y: y), font: gradeFont, color: gradeColor, gc: gc)
 
-        let scoreFont = UIFont.monospacedSystemFont(ofSize: 60, weight: .black)
+        let scoreFont = UIFont.monospacedSystemFont(ofSize: 68, weight: .black)
         let gradeSize = (grade as NSString).size(withAttributes: [.font: gradeFont])
-        draw(String(format: "%.0f%%", score.overall), at: CGPoint(x: pad + gradeSize.width + 16, y: y + 20), font: scoreFont, color: gradeColor, gc: gc)
-        y += 110
+        draw(String(format: "%.0f%%", score.overall), at: CGPoint(x: pad + gradeSize.width + 16, y: y + 24), font: scoreFont, color: gradeColor, gc: gc)
+        y += 124
 
         drawDivider(gc: gc, y: y, x1: pad, x2: width - pad)
         y += 20
 
         // Detail rows
-        let labelFont = UIFont.monospacedSystemFont(ofSize: 28, weight: .bold)
-        let valueFont = UIFont.monospacedSystemFont(ofSize: 32, weight: .black)
-        let feedbackFont = UIFont.monospacedSystemFont(ofSize: 24, weight: .medium)
-        let barHeight: CGFloat = 10
+        let labelFont = UIFont.monospacedSystemFont(ofSize: 34, weight: .bold)
+        let valueFont = UIFont.monospacedSystemFont(ofSize: 38, weight: .black)
+        let feedbackFont = UIFont.monospacedSystemFont(ofSize: 28, weight: .medium)
+        let barHeight: CGFloat = 12
 
         let maxDetails = min(score.details.count, 5)
         let remainingH = height - y - 30
@@ -271,7 +266,7 @@ final class VideoComposer {
             draw(valText, at: CGPoint(x: width - pad - valSize.width, y: y), font: valueFont, color: dColor, gc: gc)
 
             // Bar
-            let barY = y + 36
+            let barY = y + 42
             let barW = width - pad * 2
             gc.setFillColor(UIColor.white.withAlphaComponent(0.1).cgColor)
             gc.fill(CGRect(x: pad, y: barY, width: barW, height: barHeight))

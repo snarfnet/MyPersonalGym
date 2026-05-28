@@ -1,0 +1,4 @@
+NSCameraUsageDescription = "Camera is used to analyze your exercise form in real-time";
+NSPhotoLibraryAddUsageDescription = "Save workout videos to your photo library";
+NSMicrophoneUsageDescription = "Microphone is used for video recording";
+CFBundleDisplayName = "My Personal Gym";

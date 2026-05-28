@@ -1,0 +1,4 @@
+NSCameraUsageDescription = "運動フォームをリアルタイムで分析するためにカメラを使用します";
+NSPhotoLibraryAddUsageDescription = "ワークアウト動画をフォトライブラリに保存します";
+NSMicrophoneUsageDescription = "動画録画のためにマイクを使用します";
+CFBundleDisplayName = "マイパーソナルジム";
